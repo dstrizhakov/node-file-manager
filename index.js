@@ -26,40 +26,41 @@ class FileManager {
         console.log(`Welcome to the File Manager, ${this.user}!`);
         console.log(`You are currently in ${this.directory}`);
 
-        this.cli.on('line', async (line) => {
-            const command = line.toString().trim().split(' ')[0];
-            const params = line.toString().trim().split(' ').slice(1);
-            switch (command) {
-                case 'ls' :
-                    await this.ls();
-                    console.log(`You are currently in ${this.directory}`);
-                    break;
-                case 'os' :
-                    this.os(params[0]);
-                    console.log(`You are currently in ${this.directory}`);
-                    break;
-                case 'up':
-                    this.up();
-                    console.log(`You are currently in ${this.directory}`);
-                    break;
-                case 'cd':
-                    if (params[0]) {
-                        await this.cd(params[0]);
+        this.cli
+            .on('line', async (line) => {
+                const command = line.toString().trim().split(' ')[0];
+                const params = line.toString().trim().split(' ').slice(1);
+                switch (command) {
+                    case 'ls' :
+                        await this.ls();
                         console.log(`You are currently in ${this.directory}`);
-                    } else {
-                        console.log('Invalid input');
-                    }
-                    break;
-                case '.exit':
-                    this.exit();
-                    break;
-                default:
-                    if (command) {
-                        console.log('Invalid input');
-                    }
-            }
+                        break;
+                    case 'os' :
+                        this.os(params[0]);
+                        console.log(`You are currently in ${this.directory}`);
+                        break;
+                    case 'up':
+                        this.up();
+                        console.log(`You are currently in ${this.directory}`);
+                        break;
+                    case 'cd':
+                        if (params[0]) {
+                            await this.cd(params[0]);
+                            console.log(`You are currently in ${this.directory}`);
+                        } else {
+                            console.log('Invalid input');
+                        }
+                        break;
+                    case '.exit':
+                        this.exit();
+                        break;
+                    default:
+                        if (command) {
+                            console.log('Invalid input');
+                        }
+                }
 
-        })
+            })
             .on('SIGINT', () => {
                 this.exit();
             })
@@ -81,7 +82,9 @@ class FileManager {
             for (let i = 0; i < items.length; i++) {
                 listTable.push({Name: items[i].name, Type: items[i].isDirectory() ? 'directory' : 'file'})
             }
-            console.table(listTable);
+            const dirListSorted = listTable.filter(item => item.Type === 'directory').sort((a,b) => a.Name.localeCompare(b.Name));
+            const fileListSorted = listTable.filter(item => item.Type === 'file').sort((a,b) => a.Name.localeCompare(b.Name))
+            console.table([...dirListSorted, ...fileListSorted]);
         } catch {
             this.handleError();
         }
@@ -93,7 +96,8 @@ class FileManager {
         if (pathParts.length === 2) {
             newPath = pathParts[0] + '\\';
         } else {
-            newPath = pathParts.reverse().slice(1).reverse().join('\\');
+            pathParts.pop();
+            newPath = pathParts.join('\\');
         }
         this.directory = newPath;
     }
@@ -141,4 +145,6 @@ class FileManager {
 }
 
 const homeDir = os.homedir();
-new FileManager(readline.createInterface({input, output}), __dirname);
+const rl = readline.createInterface({input, output});
+
+new FileManager(rl, homeDir);
