@@ -9,10 +9,9 @@ const __dirname = path.dirname(__filename);
 
 
 class FileManager {
-    constructor(user) {
+    constructor() {
         this.currentDirectory = __dirname;
-        this.user = user || 'anonymous';
-        this.systemUser = ''
+        this.user = 'anonymous';
     }
 
     start() {
@@ -31,6 +30,10 @@ class FileManager {
                     break;
             }
         })
+            .on ('close', () => {
+                rl.write(`Thank you for using File Manager, ${this.user}, goodbye!\n`)
+                process.exit(0);
+            })
     }
 
     async ls() {
