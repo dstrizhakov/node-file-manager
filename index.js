@@ -1,4 +1,4 @@
-import {readdir, stat, cp} from 'node:fs/promises';
+import fs, {readdir, stat, cp} from 'node:fs/promises';
 import path from 'node:path';
 import * as readline from 'node:readline/promises';
 import {stdin as input, stdout as output} from 'node:process';
@@ -8,8 +8,7 @@ import {fileURLToPath} from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log(os.homedir())
-
+console.log(__dirname)
 
 class FileManager {
     constructor(cli, directory) {
@@ -39,6 +38,18 @@ class FileManager {
                     this.os(params[0]);
                     console.log(`You are currently in ${this.directory}`);
                     break;
+                case 'up':
+                    this.up();
+                    console.log(`You are currently in ${this.directory}`);
+                    break;
+                case 'cd':
+                    if (params[0]) {
+                        await this.cd(params[0]);
+                        console.log(`You are currently in ${this.directory}`);
+                    } else {
+                        console.log('Invalid input');
+                    }
+                    break;
                 case '.exit':
                     this.exit();
                     break;
@@ -65,17 +76,46 @@ class FileManager {
 
     async ls() {
         try {
-            const items = await readdir(this.directory);
+            const items = await readdir(this.directory, {withFileTypes: true});
             const listTable = [];
             for (let i = 0; i < items.length; i++) {
-                const itemStat = await stat(path.join(this.directory, items[i]));
-                listTable.push({Name: items[i], Type: itemStat.isDirectory() ? 'directory' : 'file'})
+                listTable.push({Name: items[i].name, Type: items[i].isDirectory() ? 'directory' : 'file'})
             }
             console.table(listTable);
         } catch {
             this.handleError();
         }
     }
+
+    up() {
+        let newPath;
+        const pathParts = this.directory.split('\\');
+        if (pathParts.length === 2) {
+            newPath = pathParts[0] + '\\';
+        } else {
+            newPath = pathParts.reverse().slice(1).reverse().join('\\');
+        }
+        this.directory = newPath;
+    }
+
+    async cd(path) {
+        try {
+            const isAbsolute = path.split(':\\').length > 1;
+            if (isAbsolute) {
+                await readdir(path);
+                this.directory = path;
+            } else {
+                const pathParts = this.directory.split('\\');
+                pathParts.push(path);
+                const newPath = pathParts.join('\\');
+                await readdir(newPath);
+                this.directory = newPath;
+            }
+        } catch {
+            console.log('No such directory')
+        }
+    }
+
 
     os(param) {
         switch (param) {
@@ -100,4 +140,5 @@ class FileManager {
     }
 }
 
-new FileManager(readline.createInterface({input, output}), os.homedir());
+const homeDir = os.homedir();
+new FileManager(readline.createInterface({input, output}), __dirname);
