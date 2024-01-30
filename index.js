@@ -33,9 +33,11 @@ class FileManager {
             switch (command) {
                 case 'ls' :
                     await this.ls();
+                    console.log(`You are currently in ${this.directory}`);
                     break;
                 case 'os' :
                     this.os(params[0]);
+                    console.log(`You are currently in ${this.directory}`);
                     break;
                 case '.exit':
                     this.exit();
@@ -45,7 +47,7 @@ class FileManager {
                         console.log('Invalid input');
                     }
             }
-            console.log(`You are currently in ${this.directory}`);
+
         })
             .on('SIGINT', () => {
                 this.exit();
@@ -74,7 +76,8 @@ class FileManager {
             this.handleError();
         }
     }
-    os (param) {
+
+    os(param) {
         switch (param) {
             case '--EOL':
                 console.log(os.EOL);
