@@ -1,10 +1,12 @@
-import fs, { readdir, cp, access, rename, rm as remove } from 'node:fs/promises';
-import { createWriteStream, createReadStream } from 'node:fs';
+import fs, {readdir, cp, access, rename, rm as remove} from 'node:fs/promises';
+import {createWriteStream, createReadStream} from 'node:fs';
+import {pipeline} from 'node:stream/promises';
 import path from 'node:path';
 import * as readline from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
+import {stdin as input, stdout as output} from 'node:process';
 import os from 'node:os';
-import { fileURLToPath } from 'url';
+import {fileURLToPath} from 'url';
+import {prettyConsole} from "./src/console.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,8 +26,8 @@ class FileManager {
             if (arg.startsWith('--username'))
                 this.user = arg.split('=')[1] || 'anonymous';
         })
-        console.log(`Welcome to the File Manager, ${this.user}!`);
-        console.log(`You are currently in ${this.directory}`);
+        prettyConsole.info(`Welcome to the File Manager, ${this.user}!`)
+        prettyConsole.info(`You are currently in ${this.directory}`)
         this.initCli();
 
     }
@@ -40,70 +42,70 @@ class FileManager {
                 switch (command) {
                     case 'ls':
                         await this.ls();
-                        console.log(`You are currently in ${this.directory}`);
+                        prettyConsole.info(`You are currently in ${this.directory}`)
                         break;
                     case 'os':
                         this.os(params[0]);
-                        console.log(`You are currently in ${this.directory}`);
+                        prettyConsole.info(`You are currently in ${this.directory}`)
                         break;
                     case 'up':
                         this.up();
-                        console.log(`You are currently in ${this.directory}`);
+                        prettyConsole.info(`You are currently in ${this.directory}`)
                         break;
                     case 'cd':
                         if (params[0]) {
                             await this.cd(params[0]);
-                            console.log(`You are currently in ${this.directory}`);
+                            prettyConsole.info(`You are currently in ${this.directory}`)
                         } else {
-                            console.log('Invalid input');
+                            prettyConsole.error(`Invalid input`)
                         }
                         break;
                     case 'add':
                         if (params[0]) {
                             await this.add(params[0]);
-                            console.log(`You are currently in ${this.directory}`);
+                            prettyConsole.info(`You are currently in ${this.directory}`)
                         } else {
-                            console.log('Invalid input');
+                            prettyConsole.error(`Invalid input`)
                         }
                         break;
                     case 'cat':
                         if (params[0]) {
                             await this.cat(params[0]);
-                            console.log(`You are currently in ${this.directory}`);
+                            prettyConsole.info(`You are currently in ${this.directory}`)
                         } else {
-                            console.log('Invalid input');
+                            prettyConsole.error(`Invalid input`)
                         }
                         break;
                     case 'rn':
                         if (params[0] && params[1]) {
-                            await this.rn(undefined, params[0], params[1]);
-                            console.log(`You are currently in ${this.directory}`);
+                            await this.rn(params[0], params[1]);
+                            prettyConsole.info(`You are currently in ${this.directory}`)
                         } else {
-                            console.log('Invalid input');
+                            prettyConsole.error(`Invalid input`)
                         }
                         break;
                     case 'rm':
                         if (params[0]) {
                             await this.rm(params[0]);
-                            console.log(`You are currently in ${this.directory}`);
+                            prettyConsole.info(`You are currently in ${this.directory}`)
                         } else {
-                            console.log('Invalid input');
+                            prettyConsole.error(`Invalid input`)
                         }
                         break;
                     case 'cp':
-                        if (params[0]) {
-                            await this.cp(params[0]);
-                            console.log(`You are currently in ${this.directory}`);
+                        if (params[0] && params[1]) {
+                            await this.cp(params[0], params[1]);
+                            prettyConsole.info(`You are currently in ${this.directory}`)
                         } else {
-                            console.log('Invalid input');
+                            prettyConsole.error(`Invalid input`)
                         }
                         break;
                     case 'mv':
-                        if (params[0]) {
-                            await this.mv(params[0]);
-                            console.log(`You are currently in ${this.directory}`);
+                        if (params[0] && params[1]) {
+                            await this.mv(params[0], params[1]);
+                            prettyConsole.info(`You are currently in ${this.directory}`)
                         } else {
-                            console.log('Invalid input');
+                            prettyConsole.error(`Invalid input`)
                         }
                         break;
                     case '.exit':
@@ -111,7 +113,7 @@ class FileManager {
                         break;
                     default:
                         if (command) {
-                            console.log('Invalid input');
+                            prettyConsole.error(`Invalid input`)
                         }
                 }
 
@@ -122,26 +124,22 @@ class FileManager {
     }
 
     exit() {
-        console.log(`Thank you for using File Manager, ${this.user}, goodbye!`);
+        prettyConsole.info(`Thank you for using File Manager, ${this.user}, goodbye!`)
         process.exit()
-    }
-
-    handleError() {
-        console.log('Operation failed')
     }
 
     async ls() {
         try {
-            const items = await readdir(this.directory, { withFileTypes: true });
+            const items = await readdir(this.directory, {withFileTypes: true});
             const listTable = [];
             for (let i = 0; i < items.length; i++) {
-                listTable.push({ Name: items[i].name, Type: items[i].isDirectory() ? 'directory' : 'file' })
+                listTable.push({Name: items[i].name, Type: items[i].isDirectory() ? 'directory' : 'file'})
             }
             const dirListSorted = listTable.filter(item => item.Type === 'directory').sort((a, b) => a.Name.localeCompare(b.Name));
             const fileListSorted = listTable.filter(item => item.Type === 'file').sort((a, b) => a.Name.localeCompare(b.Name))
             console.table([...dirListSorted, ...fileListSorted]);
         } catch {
-            this.handleError();
+            prettyConsole.error(`Operation failed`)
         }
     }
 
@@ -159,93 +157,163 @@ class FileManager {
 
     async cd(pathTo) {
         try {
-            // const isAbsolute = pathTo.split(':\\').length > 1;
             const isAbsolute = path.isAbsolute(pathTo)
             if (isAbsolute) {
                 await readdir(pathTo);
                 this.directory = pathTo;
             } else {
-                const pathParts = this.directory.split(this.pathSeparator);
+                const pathParts = this.directory.split(this.pathSeparator).filter(part => part !== '');
                 pathParts.push(pathTo);
                 const newPath = pathParts.join(this.pathSeparator);
                 await readdir(newPath);
                 this.directory = newPath;
             }
         } catch {
-            console.log('No such directory')
+            prettyConsole.error('No such directory');
         }
     }
 
     async add(fileName) {
         const pathToNewFile = path.join(this.directory, fileName);
 
-        // we can create new file using stream but its not required in this case
+        // we can create new file using stream, but it's not required in this case
         // const writeStream = createWriteStream(pathToNewFile, 'utf8');
         // writeStream.on('error', (error) => {
         //     console.log(error);
         // })
         // writeStream.end();
+        const content = ''; // empty content
 
         try {
-            await fs.writeFile(pathToNewFile, content, { flag: 'wx' });
+            await fs.writeFile(pathToNewFile, content, {flag: 'wx'});
         } catch (error) {
-            if (e.code === 'EEXIST') {
-                console.log(e)
+            if (error.code === 'EEXIST') {
+                prettyConsole.error('File is already exits')
+            } else {
+                prettyConsole.error(error.message)
             }
         }
+    }
+
+    cat(pathToFile) {
+        const isAbsolute = path.isAbsolute(pathToFile);
+        let pathToSourceFile;
+        if (isAbsolute) {
+            pathToSourceFile = pathToFile;
+        } else {
+            pathToSourceFile = path.join(this.directory, pathToFile);
+        }
+        return new Promise((resolve, reject) => {
+            createReadStream(pathToSourceFile)
+                .on('data', (chunk) => {
+                    process.stdout.write(chunk);
+                })
+                .on('error', (error) => {
+                    prettyConsole.error(error.message);
+                    reject()
+                })
+                .on("end", () => {
+                    process.stdout.write(os.EOL);
+                    resolve();
+                })
+        })
 
     }
 
-    cat(fileName) {
-        const pathToFile = path.join(this.directory, fileName);
-        const readStream = createReadStream(pathToFile);
-        readStream
-            .on('data', (chunk) => {
-                process.stdout.write(chunk);
-            })
-            .on('error', (error) => {
-                console.log(error);
-            })
-    }
-
-    async rn(pathToFile, currentName, newName) {
-        const pathToSourceFile = path.join(this.directory, currentName);
-        const pathToRenamedFile = path.join(this.directory, newName);
-
+    async rn(pathToFile, newName) {
+        const isAbsolute = path.isAbsolute(pathToFile);
+        let pathToSourceFile, pathToRenamedFile;
+        if (isAbsolute) {
+            pathToSourceFile = pathToFile;
+            pathToRenamedFile = pathToSourceFile
+                .split(this.pathSeparator).reverse()
+                .slice(1).reverse()
+                .join(this.pathSeparator) + this.pathSeparator + newName;
+        } else {
+            pathToSourceFile = path.join(this.directory, pathToFile);
+            pathToRenamedFile = path.join(this.directory, newName);
+        }
         try {
             await access(pathToRenamedFile);
-            throw Error('Файл с таким именем уже есть в этой папке');
+            throw Error('Destination file is already exits');
         } catch (error) {
             if (error.code === 'ENOENT') {
                 try {
                     await access(pathToSourceFile);
                     await rename(pathToSourceFile, pathToRenamedFile);
                 } catch (error) {
-                    console.log('Исходный файл не найден')
+                    prettyConsole.error('Source file is not found');
                 }
             } else {
-                console.log(error)
+                prettyConsole.error(error.message)
             }
         }
 
 
     }
 
-    async rm(fileName) {
-        const pathToFile = path.join(this.directory, fileName);
+    async rm(pathToFile) {
+        const isFilePathAbsolute = path.isAbsolute(pathToFile);
+        let pathToSourceFile
+        if (isFilePathAbsolute) {
+            pathToSourceFile = pathToFile;
+        } else {
+            pathToSourceFile = path.join(this.directory, pathToFile);
+        }
+
         try {
-            await remove(pathToFile);
+            await remove(pathToSourceFile);
         } catch {
-            console.log('Файл не найден');
+            prettyConsole.error('File is not found');
         }
     }
 
-    async cp(pathToFile, pathToNewDirectory) {
+    async cp(pathToFile, pathToDirectory) {
+        const isFilePathAbsolute = path.isAbsolute(pathToFile);
+        const isDestinationPathAbsolute = path.isAbsolute(pathToDirectory);
+        const filePathArray = pathToFile.split(this.pathSeparator);
+        const fileName = filePathArray.pop();
+        let pathToSourceFile, pathToDestinationFile;
 
+        if (isFilePathAbsolute) {
+            pathToSourceFile = pathToFile;
+        } else {
+            pathToSourceFile = path.join(this.directory, pathToFile);
+        }
+
+        if (isDestinationPathAbsolute) {
+            pathToDestinationFile = path.join(pathToDirectory, fileName);
+        } else {
+            pathToDestinationFile = path.join(this.directory, pathToDirectory, fileName);
+        }
+        try {
+            await access(pathToDestinationFile);
+            prettyConsole.error(`Destination file ${pathToDestinationFile} is already exits`)
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                try {
+                    await access(pathToSourceFile);
+                    const sourceStream = createReadStream(pathToSourceFile)
+                    const destinationStream = createWriteStream(pathToDestinationFile);
+                    await pipeline(sourceStream, destinationStream)
+                } catch (e) {
+                    prettyConsole.error('Source file is not found');
+                }
+            } else {
+                prettyConsole.error(error.message);
+            }
+        }
+        // the simple way without streams
+        // try {
+        //     await cp(pathToSourceFile, pathToDestinationFile, {recursive: true, force: false, errorOnExist: true})
+        // } catch (error) {
+        //     console.log(error)
+        // }
     }
 
-    async mv(pathToFile, pathToNewDirectory) {
-
+    async mv(pathToFile, pathToDirectory) {
+        await this.cp(pathToFile, pathToDirectory);
+        await this.rm(pathToFile);
     }
 
     os(param) {
@@ -266,12 +334,12 @@ class FileManager {
                 console.log(os.arch());
                 break;
             default:
-                console.log('Invalid input');
+                prettyConsole.error('Invalid input');
         }
     }
 }
 
 const homeDir = os.homedir();
-const rl = readline.createInterface({ input, output });
+const rl = readline.createInterface({input, output});
 
-new FileManager(rl, homeDir);
+new FileManager(rl, __dirname);
