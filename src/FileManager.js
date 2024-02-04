@@ -356,7 +356,8 @@ export class FileManager {
                     resolve();
                 })
                 .on('error', (error) => {
-                    reject(error);
+                    prettyConsole.error(`File ${fullPath} not found`)
+                    resolve();
                 })
         })
 
