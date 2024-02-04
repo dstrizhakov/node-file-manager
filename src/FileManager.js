@@ -1,6 +1,7 @@
 import fs, {readdir, cp, access, rename, rm as remove} from 'node:fs/promises';
-import {createWriteStream, createReadStream} from 'node:fs';
-import {pipeline} from 'node:stream/promises';
+import {stat, createWriteStream, createReadStream} from 'node:fs';
+import {pipeline} from 'node:stream';
+import {createGzip, createUnzip} from 'node:zlib';
 import * as crypto from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
@@ -104,7 +105,7 @@ export class FileManager {
                         break;
                     case 'hash':
                         if (params[0]) {
-                           await this.hash(params[0]);
+                            await this.hash(params[0]);
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -363,12 +364,70 @@ export class FileManager {
 
 
     }
-    async compress (pathToFile, pathToDestination) {
 
+    async compress(pathToFile, pathToDestination) {
+        const isFilePathAbsolute = path.isAbsolute(pathToFile);
+        const isDestinationPathAbsolute = path.isAbsolute(pathToDestination);
+
+        let fullFilePath, fullDestinationPath;
+        if (isFilePathAbsolute) {
+            fullFilePath = pathToFile;
+        } else {
+            fullFilePath = path.join(this.directory, pathToFile)
+        }
+        if (isDestinationPathAbsolute) {
+            fullDestinationPath = path.join(pathToDestination);
+        } else {
+            fullDestinationPath = path.join(this.directory, pathToDestination)
+        }
+
+        const gzip = createGzip();
+        const sourceStream = createReadStream(fullFilePath);
+        const destinationStream = createWriteStream(fullDestinationPath);
+
+        return new Promise((resolve) => {
+            pipeline(sourceStream, gzip, destinationStream, (error) => {
+                if (error) {
+                    prettyConsole.error('Compress process failed' + ' ' + error);
+                    resolve();
+                } else {
+                    resolve();
+                }
+            })
+        })
     }
     async decompress (pathToFile, pathToDestination) {
+        const isFilePathAbsolute = path.isAbsolute(pathToFile);
+        const isDestinationPathAbsolute = path.isAbsolute(pathToDestination);
 
+        let fullFilePath, fullDestinationPath;
+        if (isFilePathAbsolute) {
+            fullFilePath = pathToFile;
+        } else {
+            fullFilePath = path.join(this.directory, pathToFile)
+        }
+        if (isDestinationPathAbsolute) {
+            fullDestinationPath = path.join(pathToDestination);
+        } else {
+            fullDestinationPath = path.join(this.directory, pathToDestination)
+        }
+
+        const unzip = createUnzip();
+        const source = createReadStream(fullFilePath);
+        const destination = createWriteStream(fullDestinationPath);
+
+        await new Promise((resolve) => {
+            pipeline(source, unzip, destination, (error) => {
+                if (error) {
+                    prettyConsole.error('Compress process failed' + ' ' + error);
+                    resolve()
+                } else {
+                    resolve();
+                }
+            })
+        })
     }
+
 
     os(param) {
         switch (param) {

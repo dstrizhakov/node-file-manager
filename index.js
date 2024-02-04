@@ -6,4 +6,4 @@ import {FileManager} from "./src/FileManager.js";
 const homeDir = os.homedir();
 const rl = readline.createInterface({input, output});
 
-new FileManager(rl, homeDir);
+new FileManager(rl, 'G:\\RSSchool\\node-file-manager');
