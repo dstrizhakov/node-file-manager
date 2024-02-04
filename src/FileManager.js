@@ -389,14 +389,13 @@ export class FileManager {
             pipeline(sourceStream, gzip, destinationStream, (error) => {
                 if (error) {
                     prettyConsole.error('Compress process failed' + ' ' + error);
-                    resolve();
-                } else {
-                    resolve();
                 }
+                resolve();
             })
         })
     }
-    async decompress (pathToFile, pathToDestination) {
+
+    async decompress(pathToFile, pathToDestination) {
         const isFilePathAbsolute = path.isAbsolute(pathToFile);
         const isDestinationPathAbsolute = path.isAbsolute(pathToDestination);
 
@@ -420,10 +419,8 @@ export class FileManager {
             pipeline(source, unzip, destination, (error) => {
                 if (error) {
                     prettyConsole.error('Compress process failed' + ' ' + error);
-                    resolve()
-                } else {
-                    resolve();
                 }
+                resolve();
             })
         })
     }
