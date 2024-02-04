@@ -201,8 +201,8 @@ export class FileManager {
         //     console.log(error);
         // })
         // writeStream.end();
-        const content = ''; // empty content
 
+        const content = ''; // empty content
         try {
             await fs.writeFile(pathToNewFile, content, {flag: 'wx'});
         } catch (error) {
@@ -215,21 +215,15 @@ export class FileManager {
     }
 
     cat(pathToFile) {
-        const isAbsolute = path.isAbsolute(pathToFile);
-        let pathToSourceFile;
-        if (isAbsolute) {
-            pathToSourceFile = pathToFile;
-        } else {
-            pathToSourceFile = path.join(this.directory, pathToFile);
-        }
-        return new Promise((resolve, reject) => {
-            createReadStream(pathToSourceFile)
+        const sourcePath = this.getAbsolutePath(pathToFile);
+        return new Promise((resolve) => {
+            createReadStream(sourcePath)
                 .on('data', (chunk) => {
                     process.stdout.write(chunk);
                 })
                 .on('error', (error) => {
                     prettyConsole.error(error.message);
-                    reject()
+                    resolve();
                 })
                 .on("end", () => {
                     process.stdout.write(os.EOL);
@@ -252,6 +246,7 @@ export class FileManager {
             pathToSourceFile = path.join(this.directory, pathToFile);
             pathToRenamedFile = path.join(this.directory, newName);
         }
+
         try {
             await access(pathToRenamedFile);
             throw Error('Destination file is already exits');
@@ -272,49 +267,27 @@ export class FileManager {
     }
 
     async rm(pathToFile) {
-        const isFilePathAbsolute = path.isAbsolute(pathToFile);
-        let pathToSourceFile
-        if (isFilePathAbsolute) {
-            pathToSourceFile = pathToFile;
-        } else {
-            pathToSourceFile = path.join(this.directory, pathToFile);
-        }
-
+        const sourcePath = this.getAbsolutePath(pathToFile);
         try {
-            await remove(pathToSourceFile);
+            await remove(sourcePath);
         } catch {
             prettyConsole.error('File is not found');
         }
     }
 
     async cp(pathToFile, pathToDirectory) {
-        const isFilePathAbsolute = path.isAbsolute(pathToFile);
-        const isDestinationPathAbsolute = path.isAbsolute(pathToDirectory);
-        const filePathArray = pathToFile.split(this.pathSeparator);
-        const fileName = filePathArray.pop();
-        let pathToSourceFile, pathToDestinationFile;
-
-        if (isFilePathAbsolute) {
-            pathToSourceFile = pathToFile;
-        } else {
-            pathToSourceFile = path.join(this.directory, pathToFile);
-        }
-
-        if (isDestinationPathAbsolute) {
-            pathToDestinationFile = path.join(pathToDirectory, fileName);
-        } else {
-            pathToDestinationFile = path.join(this.directory, pathToDirectory, fileName);
-        }
+        const sourcePath = this.getAbsolutePath(pathToFile);
+        const destinationPath = path.join(this.getAbsolutePath(pathToDirectory), path.basename(pathToFile));
         try {
-            await access(pathToDestinationFile);
-            prettyConsole.error(`Destination file ${pathToDestinationFile} is already exits`)
+            await access(destinationPath);
+            prettyConsole.error(`Destination file ${destinationPath} is already exits`)
         } catch (error) {
             if (error.code === 'ENOENT') {
                 try {
-                    await access(pathToSourceFile);
-                    const sourceStream = createReadStream(pathToSourceFile)
-                    const destinationStream = createWriteStream(pathToDestinationFile);
-                    await pipeline(sourceStream, destinationStream)
+                    await access(sourcePath);
+                    const sourceStream = createReadStream(sourcePath)
+                    const destinationStream = createWriteStream(destinationPath);
+                    sourceStream.pipe(destinationStream);
                 } catch (e) {
                     prettyConsole.error('Source file is not found');
                 }
@@ -336,18 +309,10 @@ export class FileManager {
     }
 
     async hash(pathToFile) {
-        const isFilePathAbsolute = path.isAbsolute(pathToFile);
-        let fullPath;
-        if (isFilePathAbsolute) {
-            fullPath = pathToFile;
-        } else {
-            fullPath = path.join(this.directory, pathToFile)
-        }
-
-        return new Promise((resolve, reject) => {
-            const fileStream = createReadStream(fullPath);
+        const sourcePath = this.getAbsolutePath(pathToFile);
+        return new Promise((resolve) => {
+            const fileStream = createReadStream(sourcePath);
             const hash = crypto.createHash('sha256');
-
             fileStream
                 .on('data', (data) => {
                     hash.update(data);
@@ -357,7 +322,7 @@ export class FileManager {
                     resolve();
                 })
                 .on('error', (error) => {
-                    prettyConsole.error(`File ${fullPath} not found`)
+                    prettyConsole.error(`File ${sourcePath} not found`)
                     resolve();
                 })
         })
@@ -366,25 +331,11 @@ export class FileManager {
     }
 
     async compress(pathToFile, pathToDestination) {
-        const isFilePathAbsolute = path.isAbsolute(pathToFile);
-        const isDestinationPathAbsolute = path.isAbsolute(pathToDestination);
-
-        let fullFilePath, fullDestinationPath;
-        if (isFilePathAbsolute) {
-            fullFilePath = pathToFile;
-        } else {
-            fullFilePath = path.join(this.directory, pathToFile)
-        }
-        if (isDestinationPathAbsolute) {
-            fullDestinationPath = path.join(pathToDestination);
-        } else {
-            fullDestinationPath = path.join(this.directory, pathToDestination)
-        }
-
+        const sourcePath = this.getAbsolutePath(pathToFile);
+        const destinationPath = this.getAbsolutePath(pathToDestination)
         const gzip = createGzip();
-        const sourceStream = createReadStream(fullFilePath);
-        const destinationStream = createWriteStream(fullDestinationPath);
-
+        const sourceStream = createReadStream(sourcePath);
+        const destinationStream = createWriteStream(destinationPath);
         return new Promise((resolve) => {
             pipeline(sourceStream, gzip, destinationStream, (error) => {
                 if (error) {
@@ -396,25 +347,11 @@ export class FileManager {
     }
 
     async decompress(pathToFile, pathToDestination) {
-        const isFilePathAbsolute = path.isAbsolute(pathToFile);
-        const isDestinationPathAbsolute = path.isAbsolute(pathToDestination);
-
-        let fullFilePath, fullDestinationPath;
-        if (isFilePathAbsolute) {
-            fullFilePath = pathToFile;
-        } else {
-            fullFilePath = path.join(this.directory, pathToFile)
-        }
-        if (isDestinationPathAbsolute) {
-            fullDestinationPath = path.join(pathToDestination);
-        } else {
-            fullDestinationPath = path.join(this.directory, pathToDestination)
-        }
-
+        const sourcePath = this.getAbsolutePath(pathToFile);
+        const destinationPath = this.getAbsolutePath(pathToDestination)
         const unzip = createUnzip();
-        const source = createReadStream(fullFilePath);
-        const destination = createWriteStream(fullDestinationPath);
-
+        const source = createReadStream(sourcePath);
+        const destination = createWriteStream(destinationPath);
         await new Promise((resolve) => {
             pipeline(source, unzip, destination, (error) => {
                 if (error) {
@@ -424,7 +361,6 @@ export class FileManager {
             })
         })
     }
-
 
     os(param) {
         switch (param) {
@@ -447,4 +383,10 @@ export class FileManager {
                 prettyConsole.error('Invalid input');
         }
     }
+
+    getAbsolutePath(absoluteOrRelativePath) {
+        const isFilePathAbsolute = path.isAbsolute(absoluteOrRelativePath);
+        return isFilePathAbsolute ? absoluteOrRelativePath : path.join(this.directory, absoluteOrRelativePath)
+    }
+
 }
