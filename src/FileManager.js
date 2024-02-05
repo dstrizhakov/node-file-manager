@@ -1,18 +1,18 @@
-import fs, {readdir, cp, access, rename, rm as remove} from 'node:fs/promises';
-import {stat, createWriteStream, createReadStream} from 'node:fs';
-import {pipeline} from 'node:stream';
-import {createGzip, createUnzip} from 'node:zlib';
-import * as crypto from 'node:crypto';
+import fs, { readdir, cp, access, rename, rm as remove } from 'node:fs/promises';
+import { createWriteStream, createReadStream } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {prettyConsole} from "./console.js";
+import { prettyConsole } from "./console.js";
 
 export class FileManager {
-    constructor(cli, directory) {
+    constructor(cliController, osController, gzController, hashController, directory) {
         this.directory = directory;
         this.pathSeparator = path.sep;
         this.user = 'anonymous';
-        this.cli = cli;
+        this.cliController = cliController;
+        this.osController = osController;
+        this.gzController = gzController;
+        this.hashController = hashController;
         this.start();
     }
 
@@ -28,7 +28,7 @@ export class FileManager {
     }
 
     initCli() {
-        this.cli
+        this.cliController
             .on('line', async (line) => {
 
                 const command = line.toString().trim().split(' ')[0];
@@ -40,7 +40,7 @@ export class FileManager {
                         prettyConsole.info(`You are currently in ${this.directory}`);
                         break;
                     case 'os':
-                        this.os(params[0]);
+                        this.osController.os(params[0]);
                         prettyConsole.info(`You are currently in ${this.directory}`);
                         break;
                     case 'up':
@@ -105,7 +105,7 @@ export class FileManager {
                         break;
                     case 'hash':
                         if (params[0]) {
-                            await this.hash(params[0]);
+                            await this.hashController.hash(params[0], this.directory)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -113,7 +113,7 @@ export class FileManager {
                         break;
                     case 'compress':
                         if (params[0] && params[1]) {
-                            await this.compress(params[0], params[1]);
+                            await this.gzController.compress(params[0], params[1], this.directory)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -121,7 +121,7 @@ export class FileManager {
                         break;
                     case 'decompress':
                         if (params[0] && params[1]) {
-                            await this.decompress(params[0], params[1]);
+                            await this.gzController.decompress(params[0], params[1], this.directory)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -149,10 +149,10 @@ export class FileManager {
 
     async ls() {
         try {
-            const items = await readdir(this.directory, {withFileTypes: true});
+            const items = await readdir(this.directory, { withFileTypes: true });
             const listTable = [];
             for (let i = 0; i < items.length; i++) {
-                listTable.push({Name: items[i].name, Type: items[i].isDirectory() ? 'directory' : 'file'})
+                listTable.push({ Name: items[i].name, Type: items[i].isDirectory() ? 'directory' : 'file' })
             }
             const dirListSorted = listTable.filter(item => item.Type === 'directory').sort((a, b) => a.Name.localeCompare(b.Name));
             const fileListSorted = listTable.filter(item => item.Type === 'file').sort((a, b) => a.Name.localeCompare(b.Name))
@@ -181,7 +181,7 @@ export class FileManager {
                 await readdir(pathTo);
                 this.directory = pathTo;
             } else {
-                const pathParts = this.directory.split(this.pathSeparator).filter(part => part !== '');
+                const pathParts = this.directory.split(this.pathSeparator);
                 pathParts.push(pathTo);
                 const newPath = pathParts.join(this.pathSeparator);
                 await readdir(newPath);
@@ -204,7 +204,7 @@ export class FileManager {
 
         const content = ''; // empty content
         try {
-            await fs.writeFile(pathToNewFile, content, {flag: 'wx'});
+            await fs.writeFile(pathToNewFile, content, { flag: 'wx' });
         } catch (error) {
             if (error.code === 'EEXIST') {
                 prettyConsole.error('File is already exits')
@@ -226,7 +226,7 @@ export class FileManager {
                     resolve();
                 })
                 .on("end", () => {
-                    process.stdout.write(os.EOL);
+                    process.stdout.write(this.osController.eol);
                     resolve();
                 })
         })
@@ -306,82 +306,6 @@ export class FileManager {
     async mv(pathToFile, pathToDirectory) {
         await this.cp(pathToFile, pathToDirectory);
         await this.rm(pathToFile);
-    }
-
-    async hash(pathToFile) {
-        const sourcePath = this.getAbsolutePath(pathToFile);
-        return new Promise((resolve) => {
-            const fileStream = createReadStream(sourcePath);
-            const hash = crypto.createHash('sha256');
-            fileStream
-                .on('data', (data) => {
-                    hash.update(data);
-                })
-                .on('end', () => {
-                    prettyConsole.info(hash.digest('hex'))
-                    resolve();
-                })
-                .on('error', (error) => {
-                    prettyConsole.error(`File ${sourcePath} not found`)
-                    resolve();
-                })
-        })
-
-
-    }
-
-    async compress(pathToFile, pathToDestination) {
-        const sourcePath = this.getAbsolutePath(pathToFile);
-        const destinationPath = this.getAbsolutePath(pathToDestination)
-        const gzip = createGzip();
-        const sourceStream = createReadStream(sourcePath);
-        const destinationStream = createWriteStream(destinationPath);
-        return new Promise((resolve) => {
-            pipeline(sourceStream, gzip, destinationStream, (error) => {
-                if (error) {
-                    prettyConsole.error('Compress process failed' + ' ' + error);
-                }
-                resolve();
-            })
-        })
-    }
-
-    async decompress(pathToFile, pathToDestination) {
-        const sourcePath = this.getAbsolutePath(pathToFile);
-        const destinationPath = this.getAbsolutePath(pathToDestination)
-        const unzip = createUnzip();
-        const source = createReadStream(sourcePath);
-        const destination = createWriteStream(destinationPath);
-        await new Promise((resolve) => {
-            pipeline(source, unzip, destination, (error) => {
-                if (error) {
-                    prettyConsole.error('Compress process failed' + ' ' + error);
-                }
-                resolve();
-            })
-        })
-    }
-
-    os(param) {
-        switch (param) {
-            case '--EOL':
-                console.log(os.EOL);
-                break;
-            case '--cpus':
-                console.log(os.cpus());
-                break;
-            case '--homedir':
-                console.log(os.homedir());
-                break;
-            case '--username':
-                console.log(os.userInfo().username);
-                break;
-            case '--architecture':
-                console.log(os.arch());
-                break;
-            default:
-                prettyConsole.error('Invalid input');
-        }
     }
 
     getAbsolutePath(absoluteOrRelativePath) {
