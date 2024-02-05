@@ -3,6 +3,10 @@ import { createBrotliCompress, createBrotliDecompress } from 'node:zlib';
 import { prettyConsole } from "./console.js";
 
 class GzController {
+
+    // here is destinationPath is - path to compressed file
+    // it means the command should be like: compress file.txt archive.gz
+    // https://discord.com/channels/755676888680366081/755676889212780622/1051549297340067840
     async compress(sourcePath, destinationPath) {
         const sourceStream = createReadStream(sourcePath);
         const destinationStream = createWriteStream(destinationPath);

@@ -11,16 +11,22 @@ class OsController {
                 prettyConsole.info(this.eol);
                 break;
             case '--cpus':
-                console.info(os.cpus());
+                prettyConsole.info(`Total amount of cpus: ${os.cpus().length}`);
+                os.cpus().forEach((cpu, index) => {
+                    prettyConsole.info(`[${index + 1}]: Model: ${cpu.model}; Clock rate: ${cpu.speed/1000} GHz`);
+                })
+
+                // prettyConsole.info(`Model: ${os.cpus().length}`);
+                // console.info(os.cpus());
                 break;
             case '--homedir':
-                prettyConsole.info(os.homedir());
+                prettyConsole.info(`Homedir: ${os.homedir()}`);
                 break;
             case '--username':
-                prettyConsole.info(os.userInfo().username);
+                prettyConsole.info(`System user name: ${os.userInfo().username}`);
                 break;
             case '--architecture':
-                prettyConsole.info(os.arch());
+                prettyConsole.info(`CPU architecture: ${os.arch()}`);
                 break;
             default:
                 prettyConsole.error('Invalid input');

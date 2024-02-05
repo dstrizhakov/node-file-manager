@@ -130,6 +130,10 @@ export class FileManager {
                         }
                         break;
                     case 'compress':
+                        // here is params[1] is - path to compressed file
+                        // it means the command should be like: "compress file.txt archive.gz"
+                        // or "compress file.txt c:\users\username\archive.gz"
+                        // https://discord.com/channels/755676888680366081/755676889212780622/1051549297340067840
                         if (params[0] && params[1]) {
                             const sourcePath = this.getAbsolutePath(params[0]);
                             const destinationPath = this.getAbsolutePath(params[1])
@@ -140,6 +144,10 @@ export class FileManager {
                         }
                         break;
                     case 'decompress':
+                        // here is params[1] is - path to decompressed file
+                        // it means the command should be like: "decompress archive.gz file.txt"
+                        // or "decompress archive.gz c:\users\username\file.txt"
+                        // https://discord.com/channels/755676888680366081/755676889212780622/1051549297340067840
                         if (params[0] && params[1]) {
                             const sourcePath = this.getAbsolutePath(params[0]);
                             const destinationPath = this.getAbsolutePath(params[1])
@@ -203,9 +211,10 @@ export class FileManager {
                 await readdir(pathTo);
                 this.directory = pathTo;
             } else {
-                const pathParts = this.directory.split(this.pathSeparator);
-                pathParts.push(pathTo);
-                const newPath = pathParts.join(this.pathSeparator);
+                // const pathParts = this.directory.split(this.pathSeparator);
+                // pathParts.push(pathTo);
+                // const newPath = pathParts.join(this.pathSeparator);
+                const newPath = path.join(this.directory, pathTo);
                 await readdir(newPath);
                 this.directory = newPath;
             }
