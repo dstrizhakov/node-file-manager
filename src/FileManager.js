@@ -1,10 +1,6 @@
-import fs, { readdir, cp, access, rename, rm as remove } from 'node:fs/promises';
-import { createWriteStream, createReadStream } from 'node:fs';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
-import os from 'node:os';
 import { prettyConsole } from "./console.js";
-import { log } from 'node:console';
-
 export class FileManager {
     constructor(cliController, fileController, osController, gzController, hashController, directory) {
         this.directory = directory;

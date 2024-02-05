@@ -1,6 +1,5 @@
 import { access, writeFile, rename, rm as remove } from 'node:fs/promises';
 import { createWriteStream, createReadStream } from 'node:fs';
-import path from 'node:path';
 
 import { prettyConsole } from "./console.js";
 

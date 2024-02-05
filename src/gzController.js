@@ -1,6 +1,5 @@
 import { createWriteStream, createReadStream } from 'node:fs';
 import { createBrotliCompress, createBrotliDecompress } from 'node:zlib';
-import path from 'node:path';
 import { prettyConsole } from "./console.js";
 
 class GzController {
