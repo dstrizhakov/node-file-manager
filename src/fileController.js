@@ -1,12 +1,34 @@
-import { access, rename, rm as remove } from 'node:fs/promises';
+import { access, writeFile, rename, rm as remove } from 'node:fs/promises';
 import { createWriteStream, createReadStream } from 'node:fs';
 import path from 'node:path';
 
 import { prettyConsole } from "./console.js";
 
 class FileController {
-    cat(sourcePath) {
-        return new Promise((resolve) => {
+
+    async add(pathToNewFile) {
+
+        // we can create new file using stream, but it's not required in this case
+        // const writeStream = createWriteStream(pathToNewFile, 'utf8');
+        // writeStream.on('error', (error) => {
+        //     console.log(error);
+        // })
+        // writeStream.end();
+
+        const content = ''; // empty content
+        try {
+            await writeFile(pathToNewFile, content, { flag: 'wx' });
+        } catch (error) {
+            if (error.code === 'EEXIST') {
+                prettyConsole.error('File is already exits')
+            } else {
+                prettyConsole.error(error.message)
+            }
+        }
+    }
+
+    async cat(sourcePath) {
+        await new Promise((resolve) => {
             createReadStream(sourcePath)
                 .on('data', (chunk) => {
                     process.stdout.write(chunk);
@@ -23,7 +45,6 @@ class FileController {
     }
 
     async rn(pathToSourceFile, pathToRenamedFile) {
-
         try {
             await access(pathToRenamedFile);
             throw Error('Destination file is already exits');
@@ -51,8 +72,7 @@ class FileController {
         }
     }
 
-    async cp(sourcePath, pathToDirectory) {
-        const destinationPath = path.join(pathToDirectory, path.basename(sourcePath));
+    async cp(sourcePath, destinationPath) {
         try {
             await access(destinationPath);
             prettyConsole.error(`Destination file ${destinationPath} is already exits`)

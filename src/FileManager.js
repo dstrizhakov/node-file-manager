@@ -6,11 +6,12 @@ import { prettyConsole } from "./console.js";
 import { log } from 'node:console';
 
 export class FileManager {
-    constructor(cliController, osController, gzController, hashController, directory) {
+    constructor(cliController, fileController, osController, gzController, hashController, directory) {
         this.directory = directory;
         this.pathSeparator = path.sep;
         this.user = 'anonymous';
         this.cliController = cliController;
+        this.fileController = fileController;
         this.osController = osController;
         this.gzController = gzController;
         this.hashController = hashController;
@@ -58,7 +59,8 @@ export class FileManager {
                         break;
                     case 'add':
                         if (params[0]) {
-                            await this.add(params[0]);
+                            const pathToNewFile = path.join(this.directory, params[0]);
+                            await this.fileController.add(pathToNewFile);
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -66,7 +68,8 @@ export class FileManager {
                         break;
                     case 'cat':
                         if (params[0]) {
-                            await this.cat(params[0]);
+                            const sourcePath = this.getAbsolutePath(params[0]);
+                            await this.fileController.cat(sourcePath);
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -74,7 +77,19 @@ export class FileManager {
                         break;
                     case 'rn':
                         if (params[0] && params[1]) {
-                            await this.rn(params[0], params[1]);
+                            const isAbsolute = path.isAbsolute(params[0]);
+                            let pathToSourceFile, pathToRenamedFile;
+                            if (isAbsolute) {
+                                pathToSourceFile = params[0];
+                                pathToRenamedFile = pathToSourceFile
+                                    .split(this.pathSeparator).reverse()
+                                    .slice(1).reverse()
+                                    .join(this.pathSeparator) + this.pathSeparator + params[1];
+                            } else {
+                                pathToSourceFile = path.join(this.directory, params[0]);
+                                pathToRenamedFile = path.join(this.directory, params[1]);
+                            }
+                            await this.fileController.rn(pathToSourceFile, pathToRenamedFile)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -82,7 +97,8 @@ export class FileManager {
                         break;
                     case 'rm':
                         if (params[0]) {
-                            await this.rm(params[0]);
+                            const sourcePath = this.getAbsolutePath(params[0]);
+                            await this.fileController.rm(sourcePath)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -90,7 +106,9 @@ export class FileManager {
                         break;
                     case 'cp':
                         if (params[0] && params[1]) {
-                            await this.cp(params[0], params[1]);
+                            const sourcePath = this.getAbsolutePath(params[0]);
+                            const destinationPath = path.join(this.getAbsolutePath(params[1]), path.basename(params[0]));
+                            await this.fileController.cp(sourcePath, destinationPath)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -98,7 +116,9 @@ export class FileManager {
                         break;
                     case 'mv':
                         if (params[0] && params[1]) {
-                            await this.mv(params[0], params[1]);
+                            const sourcePath = this.getAbsolutePath(params[0]);
+                            const destinationPath = path.join(this.getAbsolutePath(params[1]), path.basename(params[0]));
+                            await this.fileController.mv(sourcePath, destinationPath)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -196,122 +216,6 @@ export class FileManager {
         } catch {
             prettyConsole.error('No such directory');
         }
-    }
-
-    async add(fileName) {
-        const pathToNewFile = path.join(this.directory, fileName);
-
-        // we can create new file using stream, but it's not required in this case
-        // const writeStream = createWriteStream(pathToNewFile, 'utf8');
-        // writeStream.on('error', (error) => {
-        //     console.log(error);
-        // })
-        // writeStream.end();
-
-        const content = ''; // empty content
-        try {
-            await fs.writeFile(pathToNewFile, content, { flag: 'wx' });
-        } catch (error) {
-            if (error.code === 'EEXIST') {
-                prettyConsole.error('File is already exits')
-            } else {
-                prettyConsole.error(error.message)
-            }
-        }
-    }
-
-    cat(pathToFile) {
-        const sourcePath = this.getAbsolutePath(pathToFile);
-        return new Promise((resolve) => {
-            createReadStream(sourcePath)
-                .on('data', (chunk) => {
-                    process.stdout.write(chunk);
-                })
-                .on('error', (error) => {
-                    prettyConsole.error(error.message);
-                    resolve();
-                })
-                .on("end", () => {
-                    process.stdout.write(this.osController.eol);
-                    resolve();
-                })
-        })
-
-    }
-
-    async rn(pathToFile, newName) {
-        const isAbsolute = path.isAbsolute(pathToFile);
-        let pathToSourceFile, pathToRenamedFile;
-        if (isAbsolute) {
-            pathToSourceFile = pathToFile;
-            pathToRenamedFile = pathToSourceFile
-                .split(this.pathSeparator).reverse()
-                .slice(1).reverse()
-                .join(this.pathSeparator) + this.pathSeparator + newName;
-        } else {
-            pathToSourceFile = path.join(this.directory, pathToFile);
-            pathToRenamedFile = path.join(this.directory, newName);
-        }
-
-        try {
-            await access(pathToRenamedFile);
-            throw Error('Destination file is already exits');
-        } catch (error) {
-            if (error.code === 'ENOENT') {
-                try {
-                    await access(pathToSourceFile);
-                    await rename(pathToSourceFile, pathToRenamedFile);
-                } catch (error) {
-                    prettyConsole.error('Source file is not found');
-                }
-            } else {
-                prettyConsole.error(error.message)
-            }
-        }
-
-
-    }
-
-    async rm(pathToFile) {
-        const sourcePath = this.getAbsolutePath(pathToFile);
-        try {
-            await remove(sourcePath);
-        } catch {
-            prettyConsole.error('File is not found');
-        }
-    }
-
-    async cp(pathToFile, pathToDirectory) {
-        const sourcePath = this.getAbsolutePath(pathToFile);
-        const destinationPath = path.join(this.getAbsolutePath(pathToDirectory), path.basename(pathToFile));
-        try {
-            await access(destinationPath);
-            prettyConsole.error(`Destination file ${destinationPath} is already exits`)
-        } catch (error) {
-            if (error.code === 'ENOENT') {
-                try {
-                    await access(sourcePath);
-                    const sourceStream = createReadStream(sourcePath)
-                    const destinationStream = createWriteStream(destinationPath);
-                    sourceStream.pipe(destinationStream);
-                } catch (e) {
-                    prettyConsole.error('Source file is not found');
-                }
-            } else {
-                prettyConsole.error(error.message);
-            }
-        }
-        // the simple way without streams
-        // try {
-        //     await cp(pathToSourceFile, pathToDestinationFile, {recursive: true, force: false, errorOnExist: true})
-        // } catch (error) {
-        //     console.log(error)
-        // }
-    }
-
-    async mv(pathToFile, pathToDirectory) {
-        await this.cp(pathToFile, pathToDirectory);
-        await this.rm(pathToFile);
     }
 
     getAbsolutePath(absoluteOrRelativePath) {
