@@ -211,9 +211,6 @@ export class FileManager {
                 await readdir(pathTo);
                 this.directory = pathTo;
             } else {
-                // const pathParts = this.directory.split(this.pathSeparator);
-                // pathParts.push(pathTo);
-                // const newPath = pathParts.join(this.pathSeparator);
                 const newPath = path.join(this.directory, pathTo);
                 await readdir(newPath);
                 this.directory = newPath;
