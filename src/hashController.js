@@ -1,12 +1,10 @@
 import { createReadStream } from 'node:fs';
 import * as crypto from 'node:crypto';
-import path from 'node:path';
 import { prettyConsole } from "./console.js";
 
 class HashController {
-    async hash(pathToFile, currentDirectory) {
-        const sourcePath = this.getAbsolutePath(pathToFile, currentDirectory);
-        return new Promise((resolve) => {
+    async hash(sourcePath) {
+        await new Promise((resolve) => {
             const fileStream = createReadStream(sourcePath);
             const hash = crypto.createHash('sha256');
             fileStream
@@ -17,15 +15,11 @@ class HashController {
                     prettyConsole.info(hash.digest('hex'))
                     resolve();
                 })
-                .on('error', (error) => {
-                    prettyConsole.error(`File ${sourcePath} not found`)
+                .on('error', () => {
+                    prettyConsole.error(`Error reading file ${sourcePath}`)
                     resolve();
                 })
         })
-    }
-    getAbsolutePath(absoluteOrRelativePath, currentDirectory) {
-        const isFilePathAbsolute = path.isAbsolute(absoluteOrRelativePath);
-        return isFilePathAbsolute ? absoluteOrRelativePath : path.join(currentDirectory, absoluteOrRelativePath)
     }
 }
 

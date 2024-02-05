@@ -3,6 +3,7 @@ import { createWriteStream, createReadStream } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { prettyConsole } from "./console.js";
+import { log } from 'node:console';
 
 export class FileManager {
     constructor(cliController, osController, gzController, hashController, directory) {
@@ -105,7 +106,8 @@ export class FileManager {
                         break;
                     case 'hash':
                         if (params[0]) {
-                            await this.hashController.hash(params[0], this.directory)
+                            const sourcePath = this.getAbsolutePath(params[0]);
+                            await this.hashController.hash(sourcePath)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -113,7 +115,9 @@ export class FileManager {
                         break;
                     case 'compress':
                         if (params[0] && params[1]) {
-                            await this.gzController.compress(params[0], params[1], this.directory)
+                            const sourcePath = this.getAbsolutePath(params[0]);
+                            const destinationPath = this.getAbsolutePath(params[1])
+                            await this.gzController.compress(sourcePath, destinationPath)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
@@ -121,7 +125,9 @@ export class FileManager {
                         break;
                     case 'decompress':
                         if (params[0] && params[1]) {
-                            await this.gzController.decompress(params[0], params[1], this.directory)
+                            const sourcePath = this.getAbsolutePath(params[0]);
+                            const destinationPath = this.getAbsolutePath(params[1])
+                            await this.gzController.decompress(sourcePath, destinationPath)
                             prettyConsole.info(`You are currently in ${this.directory}`);
                         } else {
                             prettyConsole.error(`Invalid input`);
